@@ -6,7 +6,7 @@ module sui_fantasy::fantasy_wallet_tests {
     use std::string;
 
     use sui::tx_context::{TxContext, dummy};
-    
+
     use sui_fantasy::fantasy_wallet;
 
     use oracle::decimal_value;
@@ -22,8 +22,8 @@ module sui_fantasy::fantasy_wallet_tests {
             1_000
         );
 
-        assert!(decimal_value::value(&fantasy_wallet::sui(&fantasy_wallet)) == 995_000, 0);
-        assert!(decimal_value::value(&fantasy_wallet::eth(&fantasy_wallet)) == 5_000_000_000, 0);
+        assert!(decimal_value::value(&fantasy_wallet::sui(&fantasy_wallet)) == 999_000, 0);
+        assert!(decimal_value::value(&fantasy_wallet::eth(&fantasy_wallet)) == 6_000_000, 0);
 
         fantasy_wallet::burn_for_testing(fantasy_wallet);
     }
@@ -42,6 +42,23 @@ module sui_fantasy::fantasy_wallet_tests {
 
         assert!(decimal_value::value(&fantasy_wallet::sui(&fantasy_wallet)) == 995_000, 0);
         assert!(decimal_value::value(&fantasy_wallet::eth(&fantasy_wallet)) == 5_000_000_000, 0);
+
+        fantasy_wallet::burn_for_testing(fantasy_wallet);
+    }
+
+    #[test]
+    fun test_swap_test() {
+        let fantasy_wallet = fantasy_wallet::mint_for_testing(&mut ctx());
+
+        fantasy_wallet::swap_test(
+            &mut fantasy_wallet,
+            string::utf8(b"sui"),
+            string::utf8(b"eth"),
+            1_000
+        );
+
+        assert!(decimal_value::value(&fantasy_wallet::sui(&fantasy_wallet)) == 999_000, 0);
+        assert!(decimal_value::value(&fantasy_wallet::eth(&fantasy_wallet)) == 6_000_000, 0);
 
         fantasy_wallet::burn_for_testing(fantasy_wallet);
     }

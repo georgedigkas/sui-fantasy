@@ -3,7 +3,7 @@
 
 module sui_fantasy::fantasy_wallet {
     // use std::debug;
-    use std::option;
+    use std::option::{Self, Option};
     use std::string::{Self, String};
 
     use sui::dynamic_field as dfield;
@@ -12,7 +12,7 @@ module sui_fantasy::fantasy_wallet {
     use sui::transfer::{Self};
     use sui::tx_context::{Self, TxContext};
 
-    use oracle::data::Data;
+    use oracle::data::{Self, Data};
     use oracle::decimal_value::{Self, DecimalValue};
     use oracle::simple_oracle::{Self, SimpleOracle};
     use sui::math;
@@ -116,54 +116,111 @@ module sui_fantasy::fantasy_wallet {
 
     public fun swap(
         fantasy_wallet: &mut FantasyWallet,
-        // oracle: &SimpleOracle,
+        oracle: &SimpleOracle,
         coinA: String,
         coinB: String,
         amount: u64
     ) {
-        // let rate = get_rate(oracle, coinA, coinB);
-        // let rate = decimal_value::new(500, 6);
-
         let coinA_decimal_value = get_coin_decimal_value(fantasy_wallet, coinA);
         let coinB_decimal_value = get_coin_decimal_value(fantasy_wallet, coinB);
 
         assert!(decimal_value::value(&coinA_decimal_value) >= amount, EInsufficientAmount);
 
-        let rate = decimal_value::new(500000, 6);
-        let rate_decimals = decimal_value::decimal(&rate);
+        let single_data = simple_oracle_get_latest_data(oracle, coinA, coinB);
+        let single_data = option::destroy_some(single_data);
+        let single_data_value = data::value(&single_data);
+        let rate_decimals = decimal_value::decimal(single_data_value);
+        let rate_value = decimal_value::value(single_data_value);
+
+        let rate: DecimalValue;
 
         if (decimal_value::decimal(&coinA_decimal_value) > rate_decimals) {
             rate = decimal_value::new(
-                decimal_value::value(&rate) * (math::pow(10, decimal_value::decimal(&coinA_decimal_value) - rate_decimals) as u64),
-                decimal_value::decimal(&rate) + (decimal_value::decimal(&coinA_decimal_value) - rate_decimals)
+                rate_value * (math::pow(10, decimal_value::decimal(&coinA_decimal_value) - rate_decimals) as u64),
+                rate_decimals + (decimal_value::decimal(&coinA_decimal_value) - rate_decimals)
             );
         } else if (decimal_value::decimal(&coinA_decimal_value) < rate_decimals) {
             rate = decimal_value::new(
-                decimal_value::value(&rate) / (math::pow(10, rate_decimals - decimal_value::decimal(&coinA_decimal_value)) as u64),
-                decimal_value::decimal(&rate) - (rate_decimals - decimal_value::decimal(&coinA_decimal_value))
+                rate_value / (math::pow(10, rate_decimals - decimal_value::decimal(&coinA_decimal_value)) as u64),
+                rate_decimals - (rate_decimals - decimal_value::decimal(&coinA_decimal_value))
+            );
+        }
+        else {
+            rate = decimal_value::new(
+                rate_value,
+                rate_decimals
             );
         };
 
-        let coinA_updated_value = subtract(&mut coinA_decimal_value, &rate);
+        let coinA_updated_value = subtract(&mut coinA_decimal_value, &decimal_value::new(amount, rate_decimals));
         set_coin_amount(fantasy_wallet, coinA, coinA_updated_value);
 
-        let coinB_updated_value = multiply(&mut coinB_decimal_value, &rate);
+        let exchange_res = multiply(&mut decimal_value::new(amount, rate_decimals), &rate);
+        let coinB_updated_value = add(&mut coinB_decimal_value, &exchange_res);
         set_coin_amount(fantasy_wallet, coinB, coinB_updated_value);
     }
 
-    public fun get_rate(
+    public fun swap_test(
+        fantasy_wallet: &mut FantasyWallet,
+        coinA: String,
+        coinB: String,
+        amount: u64
+    ) {
+        let coinA_decimal_value = get_coin_decimal_value(fantasy_wallet, coinA);
+        let coinB_decimal_value = get_coin_decimal_value(fantasy_wallet, coinB);
+
+        assert!(decimal_value::value(&coinA_decimal_value) >= amount, EInsufficientAmount);
+
+        let single_data = option::some(
+            data::new<DecimalValue>(
+                decimal_value::new(500000, 6),
+                string::utf8(b""),
+                0,
+                0,
+                @0,
+                string::utf8(b"")
+        ));
+
+        let single_data = option::destroy_some(single_data);
+        let single_data_value = data::value(&single_data);
+        let rate_decimals = decimal_value::decimal(single_data_value);
+        let rate_value = decimal_value::value(single_data_value);
+
+        let rate: DecimalValue;
+
+        if (decimal_value::decimal(&coinA_decimal_value) > rate_decimals) {
+            rate = decimal_value::new(
+                rate_value * (math::pow(10, decimal_value::decimal(&coinA_decimal_value) - rate_decimals) as u64),
+                rate_decimals + (decimal_value::decimal(&coinA_decimal_value) - rate_decimals)
+            );
+        } else if (decimal_value::decimal(&coinA_decimal_value) < rate_decimals) {
+            rate = decimal_value::new(
+                rate_value / (math::pow(10, rate_decimals - decimal_value::decimal(&coinA_decimal_value)) as u64),
+                rate_decimals - (rate_decimals - decimal_value::decimal(&coinA_decimal_value))
+            );
+        }
+        else {
+            rate = decimal_value::new(
+                rate_value,
+                rate_decimals
+            );
+        };
+
+        let coinA_updated_value = subtract(&mut coinA_decimal_value, &decimal_value::new(amount, rate_decimals));
+        set_coin_amount(fantasy_wallet, coinA, coinA_updated_value);
+
+        let exchange_res = multiply(&mut decimal_value::new(amount, rate_decimals), &rate);
+        let coinB_updated_value = add(&mut coinB_decimal_value, &exchange_res);
+        set_coin_amount(fantasy_wallet, coinB, coinB_updated_value);
+
+    }
+
+    public fun simple_oracle_get_latest_data(
         oracle: &SimpleOracle,
         _coinA: String,
         _coinB: String
-    ): Data<DecimalValue> {
-        // let ticker = coinA;
-        // string::append(&mut ticker, string::utf8(b"/"));
-        // string::append(&mut ticker, coinB);
-        // // HACK
-        // string::append(&mut ticker, string::utf8(b"-gate"));
-        
-        let single_data = simple_oracle::get_latest_data<DecimalValue>(oracle, string::utf8(b"usdc/usd-gate"));
-        option::destroy_some(single_data)
+    ): Option<Data<DecimalValue>> {
+        simple_oracle::get_latest_data<DecimalValue>(oracle, string::utf8(b"usdc/usd-gate"))
     }
 
     fun get_coin_decimal_value(
@@ -281,10 +338,11 @@ module sui_fantasy::fantasy_wallet {
             );
         };
 
-        let coinA_updated_value = subtract(&mut coinA_decimal_value, &rate);
+        let coinA_updated_value = subtract(&mut coinA_decimal_value, &decimal_value::new(amount, rate_decimals));
         set_coin_amount(fantasy_wallet, coinA, coinA_updated_value);
 
-        let coinB_updated_value = multiply(&mut coinB_decimal_value, &rate);
+        let exchange_res = multiply(&mut decimal_value::new(amount, rate_decimals), &rate);
+        let coinB_updated_value = add(&mut coinB_decimal_value, &exchange_res);
         set_coin_amount(fantasy_wallet, coinB, coinB_updated_value);
     }
 }
