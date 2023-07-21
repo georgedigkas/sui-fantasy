@@ -29,11 +29,11 @@ transactionBlock.moveCall({
   target: `${packageId}::${moduleName}::swap`,
   arguments: [
     transactionBlock.object(
-      "0x4994b9282d45ea1df47a6b94755682bafdb7c333b2e63b147dddeb3db9a59726"
+      "0xafb17d06df15c853cd7e151704862dac1bab16b87ac278212aef949903aac2fc"
     ),
     transactionBlock.object(oracleId),
     transactionBlock.pure("sui"),
-    transactionBlock.pure("eth"),
+    transactionBlock.pure("eur"),
     transactionBlock.pure(1000),
   ],
 });

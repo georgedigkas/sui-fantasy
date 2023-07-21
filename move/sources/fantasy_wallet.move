@@ -5,7 +5,7 @@
 module sui_fantasy::fantasy_wallet {
     // use std::debug;
     use std::option::{Self, Option};
-    use std::string::{Self, String};
+    use std::string::{Self, String, utf8};
 
     use sui::dynamic_field as dfield;
     use sui::math;
@@ -25,16 +25,22 @@ module sui_fantasy::fantasy_wallet {
     /// Error code for when someone tries to swap bigger amount that owns.
     const EInsufficientAmount: u64 = 1;
 
+    /// Error code for when someone tries to swap between two currencies that are not supported.
+    const EUnsupportedExchange: u64 = 2;
+
     // ======== Types =========
 
     /// Struct defining the FantasyWallet with different types of currencies.
     struct FantasyWallet has key {
         id: UID,
-        sui: DecimalValue,
-        eth: DecimalValue,
-        usdt: DecimalValue,
         btc: DecimalValue,
+        dai: DecimalValue,
+        eth: DecimalValue,
+        eur: DecimalValue,
+        sui: DecimalValue,
         usd: DecimalValue,
+        usdc: DecimalValue,
+        wbtc: DecimalValue,
     }
 
     /// Struct defining the Registry.
@@ -99,12 +105,14 @@ module sui_fantasy::fantasy_wallet {
     ): FantasyWallet {
         FantasyWallet {
             id: object::new(ctx),
-
-            sui: decimal_value::new(1_000_000, 4),
-            eth: decimal_value::new(1_000_000, 4),
-            usdt: decimal_value::new(1_000_000, 4),
             btc: decimal_value::new(1_000_000, 4),
+            dai: decimal_value::new(1_000_000, 4),
+            eth: decimal_value::new(1_000_000, 4),
+            eur: decimal_value::new(1_000_000, 4),
+            sui: decimal_value::new(1_000_000, 4),
             usd: decimal_value::new(1_000_000, 4),
+            usdc: decimal_value::new(1_000_000, 4),
+            wbtc: decimal_value::new(1_000_000, 4),
         }
     }
 
@@ -169,73 +177,54 @@ module sui_fantasy::fantasy_wallet {
         set_coin_amount(fantasy_wallet, coinB, coinB_updated_value);
     }
 
-    public fun swap_test(
-        fantasy_wallet: &mut FantasyWallet,
-        coinA: String,
-        coinB: String,
-        amount: u64
-    ) {
-        let coinA_decimal_value = get_coin_decimal_value(fantasy_wallet, coinA);
-        let coinB_decimal_value = get_coin_decimal_value(fantasy_wallet, coinB);
-
-        assert!(decimal_value::value(&coinA_decimal_value) >= amount, EInsufficientAmount);
-
-        let single_data = option::some(
-            data::new<DecimalValue>(
-                decimal_value::new(500000, 6),
-                string::utf8(b""),
-                0,
-                0,
-                @0,
-                string::utf8(b"")
-        ));
-
-        let single_data = option::destroy_some(single_data);
-        let single_data_value = data::value(&single_data);
-        let rate_decimals = decimal_value::decimal(single_data_value);
-        let rate_value = decimal_value::value(single_data_value);
-
-        let rate: DecimalValue;
-
-        if (decimal_value::decimal(&coinA_decimal_value) > rate_decimals) {
-            rate = decimal_value::new(
-                rate_value * (math::pow(10, decimal_value::decimal(&coinA_decimal_value) - rate_decimals) as u64),
-                rate_decimals + (decimal_value::decimal(&coinA_decimal_value) - rate_decimals)
-            );
-        } else if (decimal_value::decimal(&coinA_decimal_value) < rate_decimals) {
-            rate = decimal_value::new(
-                rate_value / (math::pow(10, rate_decimals - decimal_value::decimal(&coinA_decimal_value)) as u64),
-                rate_decimals - (rate_decimals - decimal_value::decimal(&coinA_decimal_value))
-            );
-        }
-        else {
-            rate = decimal_value::new(
-                rate_value,
-                rate_decimals
-            );
-        };
-
-        let coinA_updated_value = subtract(&mut coinA_decimal_value, &decimal_value::new(amount, rate_decimals));
-        set_coin_amount(fantasy_wallet, coinA, coinA_updated_value);
-
-        let exchange_res = multiply(&mut decimal_value::new(amount, rate_decimals), &rate);
-        let coinB_updated_value = add(&mut coinB_decimal_value, &exchange_res);
-        set_coin_amount(fantasy_wallet, coinB, coinB_updated_value);
-
-    }
-
-    public fun simple_oracle_get_latest_data(
+    fun simple_oracle_get_latest_data(
         oracle: &SimpleOracle,
-        _coinA: String,
-        _coinB: String
+        coinA: String,
+        coinB: String
     ): Option<Data<DecimalValue>> {
-        simple_oracle::get_latest_data<DecimalValue>(oracle, string::utf8(b"usdc/usd-gate"))
+
+        assert!(
+            (coinA == string::utf8(b"btc") && coinB == string::utf8(b"usd")) ||
+            (coinA == string::utf8(b"eth") && coinB == string::utf8(b"dai")) ||
+            (coinA == string::utf8(b"eth") && coinB == string::utf8(b"usd")) ||
+            (coinA == string::utf8(b"sui") && coinB == string::utf8(b"btc")) ||
+            (coinA == string::utf8(b"sui") && coinB == string::utf8(b"eur")) ||
+            (coinA == string::utf8(b"sui") && coinB == string::utf8(b"usd")) ||
+            (coinA == string::utf8(b"usdc") && coinB == string::utf8(b"usd")) ||
+            (coinA == string::utf8(b"wbtc") && coinB == string::utf8(b"eth")),
+            EUnsupportedExchange
+        );
+
+        let ticker = coinA;
+        string::append(&mut ticker, utf8(b"/"));
+        string::append(&mut ticker, coinB);
+        string::append(&mut ticker, utf8(b"-binance"));
+
+        simple_oracle::get_latest_data<DecimalValue>(oracle, ticker)
     }
 
     fun get_coin_decimal_value(
         fantasy_wallet: &mut FantasyWallet,
         coin: String,
     ): DecimalValue {
+
+        // if (string::bytes(&coin) == string::bytes(&string::utf8(b"btc")))
+        //     return fantasy_wallet.btc;
+        // if (string::bytes(&coin) == string::bytes(&string::utf8(b"dai")))
+        //     return fantasy_wallet.dai;
+        // if (string::bytes(&coin) == string::bytes(&string::utf8(b"eth")))
+        //     return fantasy_wallet.eth;
+        // if (string::bytes(&coin) == string::bytes(&string::utf8(b"eur")))
+        //     return fantasy_wallet.eur;
+        // if (string::bytes(&coin) == string::bytes(&string::utf8(b"sui")))
+        //     return fantasy_wallet.sui;
+        // if (string::bytes(&coin) == string::bytes(&string::utf8(b"usd")))
+        //     return fantasy_wallet.usd;
+        // if (string::bytes(&coin) == string::bytes(&string::utf8(b"usdc")))
+        //     return fantasy_wallet.usdc;
+        // if (string::bytes(&coin) == string::bytes(&string::utf8(b"wbtc")))
+        //     return fantasy_wallet.wbtc;
+
         if (string::bytes(&coin) == string::bytes(&string::utf8(b"sui"))) {
             fantasy_wallet.sui
         }
@@ -250,16 +239,25 @@ module sui_fantasy::fantasy_wallet {
         coin: String,
         decimal_value: DecimalValue
     ) {
-        if (string::bytes(&coin) == string::bytes(&string::utf8(b"sui"))) {
-            fantasy_wallet.sui = decimal_value;
-        }
-        // else if (string::bytes(&coin) == string::bytes(&string::utf8(b"eth"))) {
-        else {
+        if (string::bytes(&coin) == string::bytes(&string::utf8(b"btc")))
+            fantasy_wallet.btc = decimal_value;
+        if (string::bytes(&coin) == string::bytes(&string::utf8(b"dai")))
+            fantasy_wallet.dai = decimal_value;
+        if (string::bytes(&coin) == string::bytes(&string::utf8(b"eth")))
             fantasy_wallet.eth = decimal_value;
-        }
+        if (string::bytes(&coin) == string::bytes(&string::utf8(b"eur")))
+            fantasy_wallet.eur = decimal_value;
+        if (string::bytes(&coin) == string::bytes(&string::utf8(b"sui")))
+            fantasy_wallet.sui = decimal_value;
+        if (string::bytes(&coin) == string::bytes(&string::utf8(b"usd")))
+            fantasy_wallet.usd = decimal_value;
+        if (string::bytes(&coin) == string::bytes(&string::utf8(b"usdc")))
+            fantasy_wallet.usdc = decimal_value;
+        if (string::bytes(&coin) == string::bytes(&string::utf8(b"wbtc")))
+            fantasy_wallet.wbtc = decimal_value;
     }
 
-    public fun add(
+    fun add(
         self: &mut DecimalValue, 
         other: &DecimalValue
     ): DecimalValue {
@@ -270,7 +268,7 @@ module sui_fantasy::fantasy_wallet {
         decimal_value::new(new_value, decimal_value::decimal(self))
     }
 
-    public fun subtract(
+    fun subtract(
         self: &mut DecimalValue, 
         other: &DecimalValue
     ): DecimalValue {
@@ -281,7 +279,7 @@ module sui_fantasy::fantasy_wallet {
         decimal_value::new(new_value, decimal_value::decimal(self))
     }
 
-    public fun multiply(
+    fun multiply(
         self: &mut DecimalValue, 
         other: &DecimalValue
     ): DecimalValue {
@@ -292,18 +290,27 @@ module sui_fantasy::fantasy_wallet {
         decimal_value::new(new_value, decimal_value::decimal(self))
     }
 
-    public fun sui(self: &FantasyWallet): DecimalValue { self.sui }
+    public fun btc(self: &FantasyWallet): DecimalValue { self.btc }
+    public fun dai(self: &FantasyWallet): DecimalValue { self.dai }
     public fun eth(self: &FantasyWallet): DecimalValue { self.eth }
+    public fun eur(self: &FantasyWallet): DecimalValue { self.eur }
+    public fun sui(self: &FantasyWallet): DecimalValue { self.sui }
+    public fun usd(self: &FantasyWallet): DecimalValue { self.usd }
+    public fun usdc(self: &FantasyWallet): DecimalValue { self.usdc }
+    public fun wbtc(self: &FantasyWallet): DecimalValue { self.wbtc }
 
     #[test_only]
     public fun mint_for_testing(ctx: &mut TxContext): FantasyWallet {
         FantasyWallet {
             id: object::new(ctx),
-            sui: decimal_value::new(1_000_000, 4),
-            eth: decimal_value::new(1_000_000, 4),
-            usdt: decimal_value::new(1_000_000, 4),
             btc: decimal_value::new(1_000_000, 4),
+            dai: decimal_value::new(1_000_000, 4),
+            eth: decimal_value::new(1_000_000, 4),
+            eur: decimal_value::new(1_000_000, 4),
+            sui: decimal_value::new(1_000_000, 4),
             usd: decimal_value::new(1_000_000, 4),
+            usdc: decimal_value::new(1_000_000, 4),
+            wbtc: decimal_value::new(1_000_000, 4),
         }
     }
 
@@ -311,11 +318,14 @@ module sui_fantasy::fantasy_wallet {
     public fun burn_for_testing(fantasy_wallet: FantasyWallet) {
         let FantasyWallet {
             id,
-            sui: _,
-            eth: _,
-            usdt: _,
             btc: _,
+            dai: _,
+            eth: _,
+            eur: _,
+            sui: _,
             usd: _,
+            usdc: _,
+            wbtc: _,
         } = fantasy_wallet;
         object::delete(id)
     }
