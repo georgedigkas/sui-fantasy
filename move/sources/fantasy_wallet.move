@@ -14,7 +14,7 @@ module sui_fantasy::fantasy_wallet {
     use sui::transfer::{Self};
     use sui::tx_context::{Self, TxContext};
 
-    /// Importing necessary modules from the oracle package.
+    // Importing necessary modules from the oracle package.
     use oracle::data::{Self, Data};
     use oracle::decimal_value::{Self, DecimalValue};
     use oracle::simple_oracle::{Self, SimpleOracle};
@@ -83,13 +83,13 @@ module sui_fantasy::fantasy_wallet {
     ) {
         let sender = tx_context::sender(ctx);
 
-        /// Asserts that the sender is not already registered.
+        // Asserts that the sender is not already registered.
         assert!(
             !dfield::exists_with_type<address, bool>(&registry.id, sender), 
             EAlreadyRegistered
         );
 
-        /// Adds the sender to the registry.
+        // Adds the sender to the registry.
         dfield::add<address, bool>(&mut registry.id, sender, true);
         mint_and_transfer(ctx);
     }
@@ -131,10 +131,10 @@ module sui_fantasy::fantasy_wallet {
         let coinA_decimal_value = get_coin_decimal_value(fantasy_wallet, coinA);
         let coinB_decimal_value = get_coin_decimal_value(fantasy_wallet, coinB);
 
-        /// Asserts that the value of coinA is greater than or equal to the amount being swapped.
+        // Asserts that the value of coinA is greater than or equal to the amount being swapped.
         assert!(decimal_value::value(&coinA_decimal_value) >= amount, EInsufficientAmount);
 
-        /// Gets the latest data from the oracle for the exchange rate between coinA and coinB.
+        // Gets the latest data from the oracle for the exchange rate between coinA and coinB.
         let single_data = simple_oracle_get_latest_data(oracle, coinA, coinB);
         let single_data = option::destroy_some(single_data);
         let single_data_value = data::value(&single_data);
