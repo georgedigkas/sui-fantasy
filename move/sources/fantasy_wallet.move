@@ -1,30 +1,33 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+/// This module defines the fantasy wallet for the sui-fantasy game.
 module sui_fantasy::fantasy_wallet {
     // use std::debug;
     use std::option::{Self, Option};
     use std::string::{Self, String};
 
     use sui::dynamic_field as dfield;
+    use sui::math;
     use sui::object::{Self, UID};
     use sui::package;
     use sui::transfer::{Self};
     use sui::tx_context::{Self, TxContext};
 
+    /// Importing necessary modules from the oracle package.
     use oracle::data::{Self, Data};
     use oracle::decimal_value::{Self, DecimalValue};
     use oracle::simple_oracle::{Self, SimpleOracle};
-    use sui::math;
 
-    /// For when someone tries to claim an NFT again.
+    /// Error code for when someone tries to claim an NFT again.
     const EAlreadyRegistered: u64 = 0;
 
-    /// For when someone tries to swap bigger amount that owns.
+    /// Error code for when someone tries to swap bigger amount that owns.
     const EInsufficientAmount: u64 = 1;
 
     // ======== Types =========
 
+    /// Struct defining the FantasyWallet with different types of currencies.
     struct FantasyWallet has key {
         id: UID,
         sui: DecimalValue,
@@ -34,11 +37,10 @@ module sui_fantasy::fantasy_wallet {
         usd: DecimalValue,
     }
 
+    /// Struct defining the Registry.
     struct Registry has key { id: UID }
 
-    /// Belongs to the creator of the game. Has store, which
-    /// allows building something on top of it (ie shared object with
-    /// multi-access policy for managers).
+    /// Struct defining the AdminCap which belongs to the creator of the game.
     struct AdminCap has key, store { id: UID }
 
     /// One Time Witness to create the `Publisher`.
@@ -74,17 +76,20 @@ module sui_fantasy::fantasy_wallet {
         mint(ctx)
     }
 
+    /// Function to mint and transfer a "FantasyWallet" to the sender.
     public fun mint_and_transfer_fantasy_wallet(
         registry: &mut Registry, 
         ctx: &mut TxContext
     ) {
         let sender = tx_context::sender(ctx);
 
+        /// Asserts that the sender is not already registered.
         assert!(
             !dfield::exists_with_type<address, bool>(&registry.id, sender), 
             EAlreadyRegistered
         );
 
+        /// Adds the sender to the registry.
         dfield::add<address, bool>(&mut registry.id, sender, true);
         mint_and_transfer(ctx);
     }
@@ -103,6 +108,7 @@ module sui_fantasy::fantasy_wallet {
         }
     }
 
+    /// Function to mint and transfer a new fantasy wallet to the sender.
     fun mint_and_transfer(
         ctx: &mut TxContext
     ) {
@@ -114,6 +120,7 @@ module sui_fantasy::fantasy_wallet {
 
     // ======= Fantasy Wallet Functions =======
 
+    /// Function to swap between two currencies in a fantasy wallet using an oracle.
     public fun swap(
         fantasy_wallet: &mut FantasyWallet,
         oracle: &SimpleOracle,
@@ -124,8 +131,10 @@ module sui_fantasy::fantasy_wallet {
         let coinA_decimal_value = get_coin_decimal_value(fantasy_wallet, coinA);
         let coinB_decimal_value = get_coin_decimal_value(fantasy_wallet, coinB);
 
+        /// Asserts that the value of coinA is greater than or equal to the amount being swapped.
         assert!(decimal_value::value(&coinA_decimal_value) >= amount, EInsufficientAmount);
 
+        /// Gets the latest data from the oracle for the exchange rate between coinA and coinB.
         let single_data = simple_oracle_get_latest_data(oracle, coinA, coinB);
         let single_data = option::destroy_some(single_data);
         let single_data_value = data::value(&single_data);
