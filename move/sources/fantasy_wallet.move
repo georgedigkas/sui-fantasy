@@ -3,7 +3,6 @@
 
 /// This module defines the fantasy wallet for the sui-fantasy game.
 module sui_fantasy::fantasy_wallet {
-    // use std::debug;
     use std::option::{Self, Option};
     use std::string::{Self, String, utf8};
 
@@ -290,6 +289,17 @@ module sui_fantasy::fantasy_wallet {
         decimal_value::new(new_value, decimal_value::decimal(self))
     }
 
+    fun devide(
+        self: &mut DecimalValue, 
+        other: &DecimalValue
+    ): DecimalValue {
+        if (decimal_value::decimal(self) != decimal_value::decimal(other)) {
+            // Return an error or convert one of the values to have the same number of decimals as the other
+        };
+        let new_value = decimal_value::value(self) / decimal_value::value(other);
+        decimal_value::new(new_value, decimal_value::decimal(self))
+    }
+
     public fun btc(self: &FantasyWallet): DecimalValue { self.btc }
     public fun dai(self: &FantasyWallet): DecimalValue { self.dai }
     public fun eth(self: &FantasyWallet): DecimalValue { self.eth }
@@ -361,6 +371,7 @@ module sui_fantasy::fantasy_wallet {
         set_coin_amount(fantasy_wallet, coinA, coinA_updated_value);
 
         let exchange_res = multiply(&mut decimal_value::new(amount, rate_decimals), &rate);
+        let exchange_res = devide(&mut exchange_res, &decimal_value::new(math::pow(10, decimal_value::decimal(&coinA_decimal_value)), rate_decimals));
         let coinB_updated_value = add(&mut coinB_decimal_value, &exchange_res);
         set_coin_amount(fantasy_wallet, coinB, coinB_updated_value);
     }

@@ -23,7 +23,7 @@ module sui_fantasy::fantasy_wallet_tests {
         );
 
         assert!(decimal_value::value(&fantasy_wallet::sui(&fantasy_wallet)) == 999_000, 0);
-        assert!(decimal_value::value(&fantasy_wallet::eth(&fantasy_wallet)) == 6_000_000, 0);
+        assert!(decimal_value::value(&fantasy_wallet::eth(&fantasy_wallet)) == 1_000_500, 0);
 
         fantasy_wallet::burn_for_testing(fantasy_wallet);
     }
