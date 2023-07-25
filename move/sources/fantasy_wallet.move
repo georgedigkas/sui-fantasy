@@ -172,6 +172,7 @@ module sui_fantasy::fantasy_wallet {
         set_coin_amount(fantasy_wallet, coinA, coinA_updated_value);
 
         let exchange_res = multiply(&mut decimal_value::new(amount, rate_decimals), &rate);
+        let exchange_res = devide(&mut exchange_res, &decimal_value::new(math::pow(10, decimal_value::decimal(&coinA_decimal_value)), rate_decimals));
         let coinB_updated_value = add(&mut coinB_decimal_value, &exchange_res);
         set_coin_amount(fantasy_wallet, coinB, coinB_updated_value);
     }
@@ -206,31 +207,22 @@ module sui_fantasy::fantasy_wallet {
         fantasy_wallet: &mut FantasyWallet,
         coin: String,
     ): DecimalValue {
-
-        // if (string::bytes(&coin) == string::bytes(&string::utf8(b"btc")))
-        //     return fantasy_wallet.btc;
-        // if (string::bytes(&coin) == string::bytes(&string::utf8(b"dai")))
-        //     return fantasy_wallet.dai;
-        // if (string::bytes(&coin) == string::bytes(&string::utf8(b"eth")))
-        //     return fantasy_wallet.eth;
-        // if (string::bytes(&coin) == string::bytes(&string::utf8(b"eur")))
-        //     return fantasy_wallet.eur;
-        // if (string::bytes(&coin) == string::bytes(&string::utf8(b"sui")))
-        //     return fantasy_wallet.sui;
-        // if (string::bytes(&coin) == string::bytes(&string::utf8(b"usd")))
-        //     return fantasy_wallet.usd;
-        // if (string::bytes(&coin) == string::bytes(&string::utf8(b"usdc")))
-        //     return fantasy_wallet.usdc;
-        // if (string::bytes(&coin) == string::bytes(&string::utf8(b"wbtc")))
-        //     return fantasy_wallet.wbtc;
-
-        if (string::bytes(&coin) == string::bytes(&string::utf8(b"sui"))) {
-            fantasy_wallet.sui
-        }
-        // else if (string::bytes(&coin) == string::bytes(&string::utf8(b"eth"))) {
-        else {
+        if (string::bytes(&coin) == string::bytes(&string::utf8(b"btc")))
+            fantasy_wallet.btc
+        else if (string::bytes(&coin) == string::bytes(&string::utf8(b"dai")))
+            fantasy_wallet.dai
+        else if (string::bytes(&coin) == string::bytes(&string::utf8(b"eth")))
             fantasy_wallet.eth
-        }
+        else if (string::bytes(&coin) == string::bytes(&string::utf8(b"eur")))
+            fantasy_wallet.eur
+        else if (string::bytes(&coin) == string::bytes(&string::utf8(b"sui")))
+            fantasy_wallet.sui
+        else if (string::bytes(&coin) == string::bytes(&string::utf8(b"usd")))
+            fantasy_wallet.usd
+        else if (string::bytes(&coin) == string::bytes(&string::utf8(b"usdc")))
+            fantasy_wallet.usdc
+        else
+            fantasy_wallet.wbtc
     }
 
     fun set_coin_amount(
